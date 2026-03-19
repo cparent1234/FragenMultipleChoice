@@ -7,7 +7,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap');
-  :root{--navy:#0d2137;--navy-mid:#163352;--navy-light:#1e4976;--teal:#1a8fa0;--teal-light:#22b5cc;--cream:#f5f0e8;--gold:#c9a84c;--success:#2e9e6b;--danger:#d94f4f;--text:#1a1a2e;--muted:#6b7a8d;--border:#dde3ec;--radius:14px;--shadow:0 4px 24px rgba(13,33,55,0.10);--shadow-lg:0 12px 48px rgba(13,33,55,0.16);}
+  :root{--navy:#0d2137;--navy-mid:#163352;--navy-light:#1e4976;--teal:#1a8fa0;--teal-light:#22b5cc;--cream:#f5f0e8;--gold:#c9a84c;--purple:#7c4dba;--purple-light:#9d6fd4;--success:#2e9e6b;--danger:#d94f4f;--text:#1a1a2e;--muted:#6b7a8d;--border:#dde3ec;--radius:14px;--shadow:0 4px 24px rgba(13,33,55,0.10);--shadow-lg:0 12px 48px rgba(13,33,55,0.16);}
   *{box-sizing:border-box;margin:0;padding:0;}
   body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--text);min-height:100vh;overflow-x:hidden;}
   .app-header{background:linear-gradient(135deg,var(--navy) 0%,var(--navy-mid) 60%,var(--navy-light) 100%);color:white;padding:20px 24px 16px;display:flex;align-items:center;gap:14px;box-shadow:0 2px 16px rgba(0,0,0,0.25);position:sticky;top:0;z-index:100;}
@@ -121,6 +121,13 @@
   .category-scroll::-webkit-scrollbar{display:none;}
   .cat-chip{padding:6px 14px;border-radius:99px;font-size:12px;font-weight:600;white-space:nowrap;cursor:pointer;border:1.5px solid var(--border);background:white;color:var(--muted);transition:all .15s;}
   .cat-chip.active{background:var(--navy);color:white;border-color:var(--navy);}
+  .tag-chip{padding:5px 12px;border-radius:99px;font-size:12px;font-weight:600;white-space:nowrap;cursor:pointer;border:1.5px solid rgba(124,77,186,0.28);background:white;color:var(--purple);transition:all .15s;}
+  .tag-chip:hover{border-color:var(--purple-light);background:rgba(124,77,186,0.05);}
+  .tag-chip.active{background:linear-gradient(135deg,var(--purple),var(--purple-light));color:white;border-color:var(--purple);}
+  .filter-label{font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin:2px 0 4px;padding-left:2px;}
+  .q-side-tag{font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:rgba(124,77,186,0.10);color:var(--purple);border:1px solid rgba(124,77,186,0.22);white-space:nowrap;flex-shrink:0;max-width:90px;overflow:hidden;text-overflow:ellipsis;}
+  .q-badges-row{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:12px;}
+  .q-quiz-tag{display:inline-flex;align-items:center;gap:4px;background:rgba(157,111,212,0.25);border:1px solid rgba(157,111,212,0.45);border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600;color:#c9a8f0;}
   .select-all-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;margin-bottom:4px;}
   .select-count{font-size:13px;color:var(--muted);}
   .num-input-wrap{display:flex;align-items:center;gap:10px;}
@@ -148,7 +155,7 @@
         <input type="file" id="pdfInput" accept=".pdf">
         <span class="upload-icon">📄</span>
         <div class="upload-label">PDF hier ablegen oder tippen</div>
-        <div class="upload-hint">Bilder werden den Fragen automatisch zugeordnet</div>
+        <div class="upload-hint">Bilder und seitliche Kategorien werden den Fragen zugeordnet</div>
       </div>
       <div id="uploadStatus" style="margin-top:14px;display:none;">
         <div class="progress-bar-wrap"><div class="progress-bar" id="progressBar"></div></div>
@@ -188,7 +195,12 @@
         <span class="search-icon">🔍</span>
         <input type="text" id="searchInput" placeholder="Fragen durchsuchen…" oninput="filterQuestions()">
       </div>
+      <div class="filter-label">Kapitel</div>
       <div class="category-scroll" id="categoryRow"></div>
+      <div id="tagSection" style="display:none;">
+        <div class="filter-label" style="color:var(--purple);">Thema</div>
+        <div class="category-scroll" id="tagRow"></div>
+      </div>
       <div class="select-all-row">
         <span class="select-count" id="selectCount">0 ausgewählt</span>
         <div style="display:flex;gap:6px;">
@@ -245,7 +257,10 @@
       <div class="quiz-counter" id="quizCounter">0/0</div>
     </div>
     <div class="question-card">
-      <div class="q-number-badge" id="quizQuestionBadge">Frage 1</div>
+      <div class="q-badges-row">
+        <span class="q-number-badge" id="quizQuestionBadge">Frage 1</span>
+        <span class="q-quiz-tag" id="quizTagBadge" style="display:none;"></span>
+      </div>
       <div class="q-text-main" id="quizQuestionText">Frage wird geladen…</div>
       <div id="quizImageWrap"></div>
     </div>
@@ -307,7 +322,11 @@ function load(){
     const q=localStorage.getItem('lk_questions'),c=localStorage.getItem('lk_correct'),s=localStorage.getItem('lk_settings'),fn=localStorage.getItem('lk_filename');
     if(q){
       questions=JSON.parse(q);
-      questions.forEach(q=>{try{const i=localStorage.getItem(IMG_PREFIX+q.id);q.images=i?JSON.parse(i):[];}catch(e){q.images=[];}});
+      questions.forEach(q=>{
+        try{const i=localStorage.getItem(IMG_PREFIX+q.id);q.images=i?JSON.parse(i):[];}catch(e){q.images=[];}
+        if(!q.tags)q.tags=[];
+        if(!q.sideLabel)q.sideLabel='';
+      });
     }
     if(c)correctSet=new Set(JSON.parse(c));
     if(s)settings={...settings,...JSON.parse(s)};
@@ -321,7 +340,7 @@ function load(){
     }
   }catch(e){}
 }
-function buildLoadedLabel(){const t=questions.length,wi=questions.filter(q=>q.images&&q.images.length>0).length;return wi>0?`${t} Fragen · ${wi} mit Bild 🖼️`:`${t} Fragen geladen`;}
+function buildLoadedLabel(){const t=questions.length,wi=questions.filter(q=>q.images&&q.images.length>0).length,tags=[...new Set(questions.flatMap(q=>q.tags||[]))];let s=`${t} Fragen`;if(wi>0)s+=` · ${wi} mit Bild 🖼️`;if(tags.length>0)s+=` · ${tags.length} Themen 🏷️`;return s;}
 function applySettings(){
   document.getElementById('skipCorrect').checked=settings.skipCorrect;
   document.getElementById('shuffleQuestions').checked=settings.shuffleQ;
@@ -361,15 +380,17 @@ async function handleFile(file){
     const vp=page.getViewport({scale:1});
     const ph=vp.height;
     const content=await page.getTextContent();
-    const {text,items}=buildTextAndItems(content,ph);
+    const {text,items,rotatedItems}=buildTextAndItems(content,ph);
     const images=await extractPageImages(page,ph);
-    pageData.push({pageNum:i,text,items,images});
+    pageData.push({pageNum:i,text,items,rotatedItems,images,ph});
   }
   setProgress(86,'Fragen werden extrahiert…');
   const fullText=pageData.map(p=>p.text).join('\n');
   const parsed=parseQuestions(fullText);
-  setProgress(93,'Bilder werden zugeordnet…');
+  setProgress(91,'Bilder werden zugeordnet…');
   associateImages(parsed,pageData);
+  setProgress(95,'Randkategorien werden erkannt…');
+  associateSideLabels(parsed,pageData);
   if(!parsed.length){setProgress(100,'⚠️ Keine Fragen gefunden');return;}
   questions=parsed;correctSet=new Set();
   document.getElementById('loadedFileName').textContent=file.name;
@@ -378,21 +399,33 @@ async function handleFile(file){
   document.getElementById('homeStats').style.display='';
   updateHomeProgress();updateHeaderStats();save();
   const wi=questions.filter(q=>q.images&&q.images.length>0).length;
-  setProgress(100,`✅ ${parsed.length} Fragen geladen · ${wi} mit Bild`);
+  const uniqueTags=[...new Set(questions.flatMap(q=>q.tags))];let msg=`✅ ${parsed.length} Fragen geladen`;if(wi>0)msg+=` · ${wi} mit Bild`;if(uniqueTags.length>0)msg+=` · ${uniqueTags.length} Themen erkannt`;setProgress(100,msg);
   showToast(`${parsed.length} Fragen geladen!`);
 }
 function setProgress(p,t){document.getElementById('progressBar').style.width=p+'%';document.getElementById('progressText').textContent=t;}
 
 function buildTextAndItems(content,ph){
-  let text='';const items=[];let lastY=null;
+  let text='';const items=[];const rotatedItems=[];let lastY=null;
   for(const item of content.items){
     if(!item.str)continue;
-    const yFromTop=ph-item.transform[5];
-    if(lastY!==null&&Math.abs(item.transform[5]-lastY)>2)text+='\n';
-    text+=item.str;lastY=item.transform[5];
-    if(item.str.trim())items.push({str:item.str,yFromTop,x:item.transform[4]});
+    const t=item.transform; // [a, b, c, d, e, f]
+    const yFromTop=ph-t[5];const x=t[4];
+    // True 90° rotation: diagonal components (a,d) are near zero while
+    // off-diagonal components (b,c) carry the font size.
+    // Use a strict threshold so that normal text (even italic/bold) is never
+    // misclassified. offDiag must be significant AND diagonal must be tiny.
+    const diag=Math.max(Math.abs(t[0]),Math.abs(t[3]));
+    const offDiag=Math.max(Math.abs(t[1]),Math.abs(t[2]));
+    const isRotated90=offDiag>4&&diag<offDiag*0.15;
+    if(isRotated90&&item.str.trim()){
+      rotatedItems.push({str:item.str,yFromTop,x});
+    }else{
+      if(lastY!==null&&Math.abs(t[5]-lastY)>2)text+='\n';
+      text+=item.str;lastY=t[5];
+      if(item.str.trim())items.push({str:item.str,yFromTop,x});
+    }
   }
-  return{text:text+'\n',items};
+  return{text:text+'\n',items,rotatedItems};
 }
 
 async function extractPageImages(page,ph){
@@ -482,6 +515,80 @@ function associateImages(questions,pageData){
   }
 }
 
+function extractPageSideLabels(rotatedItems){
+  if(!rotatedItems||!rotatedItems.length)return[];
+  // Sort by x then by yFromTop
+  const sorted=[...rotatedItems].sort((a,b)=>a.x!==b.x?a.x-b.x:a.yFromTop-b.yFromTop);
+  // Cluster items that are in the same x-column (within 30 PDF units)
+  const clusters=[];let cur=[sorted[0]];
+  for(let i=1;i<sorted.length;i++){
+    if(Math.abs(sorted[i].x-cur[0].x)<=30)cur.push(sorted[i]);
+    else{clusters.push(cur);cur=[sorted[i]];}
+  }
+  clusters.push(cur);
+  return clusters.map(c=>{
+    // Sort within cluster by yFromTop so characters are in reading order
+    c.sort((a,b)=>a.yFromTop-b.yFromTop);
+    const text=c.map(i=>i.str).join('').trim().replace(/\s+/g,' ');
+    const ys=c.map(i=>i.yFromTop);
+    return{text,yMin:Math.min(...ys),yMax:Math.max(...ys)};
+  }).filter(l=>l.text.length>=2);
+}
+
+function associateSideLabels(questions,pageData){
+  // Step 1: collect ALL side-label events across every page as a flat list,
+  // sorted by document order (pageNum asc, then yFromTop asc).
+  // Each event = {pageNum, y (= yMin of label), text}
+  const allLabelEvents=[];
+  for(const pd of pageData){
+    const labels=extractPageSideLabels(pd.rotatedItems||[]);
+    for(const lbl of labels){
+      allLabelEvents.push({pageNum:pd.pageNum,y:lbl.yMin,text:lbl.text});
+    }
+  }
+  allLabelEvents.sort((a,b)=>a.pageNum!==b.pageNum?a.pageNum-b.pageNum:a.y-b.y);
+  if(!allLabelEvents.length)return; // no side labels in this PDF
+
+  // Step 2: build question position map
+  const qPos={};
+  for(const pd of pageData){
+    for(const item of pd.items){
+      const m=item.str.match(/^Frage\s+(\d+)/i);
+      if(m){const n=parseInt(m[1]);if(!qPos[n])qPos[n]={pageNum:pd.pageNum,y:item.yFromTop};}
+    }
+  }
+
+  // Step 3: sort questions by document order
+  const sortedQs=[...questions].filter(q=>qPos[q.num]).sort((a,b)=>{
+    const pa=qPos[a.num],pb=qPos[b.num];
+    return pa.pageNum!==pb.pageNum?pa.pageNum-pb.pageNum:pa.y-pb.y;
+  });
+
+  // Step 4: carry-forward assignment.
+  // Walk both lists together: whenever a label event comes before (or at the
+  // same position as) the current question, update the running label.
+  // Every question inherits the last seen label.
+  let labelIdx=0;
+  let currentLabel=allLabelEvents.length>0?allLabelEvents[0].text:'';
+  for(const q of sortedQs){
+    const pos=qPos[q.num];
+    // Advance label pointer: consume all labels that appear before this question
+    while(labelIdx<allLabelEvents.length){
+      const ev=allLabelEvents[labelIdx];
+      // A label is "before" the question if it is on an earlier page,
+      // or on the same page and its y-position is at or above the question
+      // (allow 60px look-ahead so a label just below a question header still applies)
+      const before=ev.pageNum<pos.pageNum||(ev.pageNum===pos.pageNum&&ev.y<=pos.y+60);
+      if(before){currentLabel=ev.text;labelIdx++;}
+      else break;
+    }
+    if(currentLabel){
+      q.sideLabel=currentLabel;
+      if(!q.tags)q.tags=[];
+      if(!q.tags.includes(currentLabel))q.tags.push(currentLabel);
+    }
+  }
+}
 function parseQuestions(text){
   const result=[],catMap=detectCategories(text);
   text=text.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
@@ -496,7 +603,7 @@ function parseQuestions(text){
     const qText=after.substring(0,am.index).trim().replace(/\s+/g,' ');
     const answers=parseAnswers(after.substring(am.index));
     if(answers.length<2)continue;
-    result.push({id:num,num,text:qText,answers,correctIndex:0,category:catMap[num]||'Allgemein',images:[]});
+    result.push({id:num,num,text:qText,answers,correctIndex:0,category:catMap[num]||'Allgemein',images:[],tags:[],sideLabel:''});
   }
   result.sort((a,b)=>a.num-b.num);
   return result;
@@ -525,25 +632,36 @@ function updateHomeProgress(){
 }
 function updateHeaderStats(){const t=questions.length,c=correctSet.size;document.getElementById('headerStats').textContent=t>0?`${c}/${t} ✓`:'0 Fragen';}
 
-let selectedIds=new Set(),activeCategory='Alle',searchTerm='';
+let selectedIds=new Set(),activeCategory='Alle',activeTag='Alle',searchTerm='';
 function renderBrowse(){
   const cats=['Alle',...new Set(questions.map(q=>q.category))];
   document.getElementById('categoryRow').innerHTML=cats.map(c=>`<div class="cat-chip ${c===activeCategory?'active':''}" onclick="setCategory(${JSON.stringify(c)})">${c}</div>`).join('');
+  const allTags=[...new Set(questions.flatMap(q=>q.tags||[]).filter(Boolean))].sort();
+  const tagSection=document.getElementById('tagSection');
+  if(allTags.length>0){
+    tagSection.style.display='';
+    document.getElementById('tagRow').innerHTML=[{label:'Alle Themen',val:'Alle'},...allTags.map(t=>({label:t,val:t}))].map(({label,val})=>`<div class="tag-chip ${val===activeTag?'active':''}" data-tagval="${val.replace(/"/g,'&quot;').replace(/'/g,'&#39;')}" onclick="setTag(this.dataset.tagval)">${label}</div>`).join('');
+  }else{tagSection.style.display='none';}
   renderQuestionList();
 }
 function setCategory(cat){activeCategory=cat;renderBrowse();}
+function setTag(tag){activeTag=tag;renderBrowse();}
 function filterQuestions(){searchTerm=document.getElementById('searchInput').value.toLowerCase();renderQuestionList();}
+function getFilteredQuestions(){return questions.filter(q=>{const catOk=activeCategory==='Alle'||q.category===activeCategory;const tagOk=activeTag==='Alle'||(q.tags&&q.tags.includes(activeTag));const sOk=!searchTerm||q.text.toLowerCase().includes(searchTerm)||String(q.num).includes(searchTerm);return catOk&&tagOk&&sOk;});}
 function renderQuestionList(){
   const list=document.getElementById('questionList');
-  const filtered=questions.filter(q=>{const catOk=activeCategory==='Alle'||q.category===activeCategory;const sOk=!searchTerm||q.text.toLowerCase().includes(searchTerm)||String(q.num).includes(searchTerm);return catOk&&sOk;});
+  const filtered=getFilteredQuestions();
   if(!filtered.length){list.innerHTML='<div class="empty-state"><span class="empty-icon">🔍</span>Keine Fragen gefunden</div>';updateSelectCount();return;}
-  list.innerHTML=filtered.map(q=>{const done=correctSet.has(q.id),sel=selectedIds.has(q.id),hasImg=q.images&&q.images.length>0;
-    return`<div class="q-item ${done?'correct-done':''} ${sel?'selected':''}" onclick="toggleSelect(${q.id})"><div class="q-num">F.${q.num}</div><div class="q-text">${q.text.substring(0,80)}${q.text.length>80?'…':''}</div>${hasImg?'<div class="q-img-badge">🖼️</div>':''}<div class="q-check">${done?'✅':sel?'☑️':'⬜'}</div></div>`;
+  list.innerHTML=filtered.map(q=>{
+    const done=correctSet.has(q.id),sel=selectedIds.has(q.id),hasImg=q.images&&q.images.length>0;
+    const tagBadge=q.sideLabel?`<div class="q-side-tag" title="${q.sideLabel}">${q.sideLabel}</div>`:'';
+    const imgBadge=hasImg?'<div class="q-img-badge">🖼️</div>':'';
+    return`<div class="q-item ${done?'correct-done':''} ${sel?'selected':''}" onclick="toggleSelect(${q.id})"><div class="q-num">F.${q.num}</div><div class="q-text">${q.text.substring(0,75)}${q.text.length>75?'…':''}</div>${tagBadge}${imgBadge}<div class="q-check">${done?'✅':sel?'☑️':'⬜'}</div></div>`;
   }).join('');
   updateSelectCount();
 }
 function toggleSelect(id){if(selectedIds.has(id))selectedIds.delete(id);else selectedIds.add(id);renderQuestionList();}
-function selectAll(val){const f=questions.filter(q=>{const c=activeCategory==='Alle'||q.category===activeCategory;const s=!searchTerm||q.text.toLowerCase().includes(searchTerm)||String(q.num).includes(searchTerm);return c&&s;});if(val)f.forEach(q=>selectedIds.add(q.id));else f.forEach(q=>selectedIds.delete(q.id));renderQuestionList();}
+function selectAll(val){const f=getFilteredQuestions();if(val)f.forEach(q=>selectedIds.add(q.id));else f.forEach(q=>selectedIds.delete(q.id));renderQuestionList();}
 function updateSelectCount(){document.getElementById('selectCount').textContent=`${selectedIds.size} ausgewählt`;document.getElementById('startSelectedBtn').textContent=selectedIds.size>0?`▶ ${selectedIds.size} Fragen starten`:'▶ Alle starten';}
 function startSelected(){
   if(!questions.length){showToast('Keine Fragen geladen');return;}
@@ -573,6 +691,7 @@ function renderQuestion(){
   document.getElementById('quizCounter').textContent=`${quizIndex+1}/${currentQueue.length}`;
   document.getElementById('quizProgressBar').style.width=Math.round((quizIndex/currentQueue.length)*100)+'%';
   document.getElementById('quizQuestionBadge').textContent=`Frage ${q.num}`;
+  const _tb=document.getElementById('quizTagBadge');if(q.sideLabel){_tb.textContent='🏷️ '+q.sideLabel;_tb.style.display='';}else{_tb.style.display='none';}
   document.getElementById('quizQuestionText').textContent=q.text;
 
   // IMAGE
@@ -627,7 +746,7 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
 function clearAllData(){
   if(!confirm('Alle Daten löschen?'))return;
   Object.keys(localStorage).filter(k=>k.startsWith('lk_')).forEach(k=>localStorage.removeItem(k));
-  questions=[];correctSet=new Set();
+  questions=[];correctSet=new Set();selectedIds=new Set();activeCategory='Alle';activeTag='Alle';
   document.getElementById('homeQuestionCount').style.display='none';document.getElementById('homeStats').style.display='none';
   document.getElementById('uploadStatus').style.display='none';document.getElementById('progressBar').style.width='0%';
   updateHeaderStats();showToast('Daten gelöscht');
